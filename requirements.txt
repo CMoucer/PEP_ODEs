@@ -1,0 +1,4 @@
+cvxpy==1.2.0
+matplotlib==3.5.2
+Mosek==9.3.20
+numpy==1.22.3
