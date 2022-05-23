@@ -1,156 +1,146 @@
 import numpy as np
 import cvxpy as cp
 
-def compute_convergence_guarantee(mu, L=0, alpha=1, a=1., P = None,  upper=2., lower=0., epsilon=10 ** -4):
-        """
-        Consider the gradient flow
-                dx/dt = - alpha * grad f(x(t)),
-        where alpha is a positive parameter, f a L-smooth, mu-strongly convex function, and x* a stationary point.
+def compute_convergence_guarantee(mu, alpha=1, a=1., c = None,  upper=2., lower=0., epsilon=10 ** -5, verbose=False):
+    """
+    Consider the gradient flow
+            dx/dt = - alpha * grad f(x(t)),
+    where alpha is a positive parameter, f a mu-strongly convex function, and x_* a stationary point.
 
-        We consider quadratic Lyapunov functions
-                V(x(t)) = a(f(x(t)) - f^*) + P ||x(t) - x_*||^2,
-        where a,c are positive parameters.
+    We consider quadratic Lyapunov functions
+            V(x(t)) = a(f(x(t)) - f_*) + c ||x(t) - x_*||^2,
+    where a,c are positive parameters.
 
-        This code compute the worst-case guarantee tau(mu, L, alpha, P) that verifies
-                d/dt V(x) <= - tau(mu, L, alpha, P) V(x),
-        for all L-smooth, mu-strongly convex functions, and all solution x to the gradient flow.
+    This code compute the worst-case guarantee tau(mu, alpha, c) that verifies
+            d/dt V(x) <= - tau(mu, alpha, c) V(x),
+    for all mu-strongly convex functions, and all solution x to the gradient flow.
 
-        When P=None, this code optimizes over the family of quadratic Lyapunov function.
+    When P=None, this code optimizes over the family of quadratic Lyapunov function.
 
-        :param mu: strong convexity assumption
-        :param L: smoothness assumption
-        :param alpha: positive ODE parameter
-        :param a: lyapunov parameter (one has to be fixed)
-        :param upper: upper bound on the convergence rate
-        :param lower: lower bound on the convergence rate
-        :param epsilon: precision
-        :return:
-            - worst-case guarantee tau(L, mu, alpha, P)
-            - P
-            - dual variables associated with interpolation inequalities
+    :param mu: strong convexity assumption
+    :param alpha: positive ODE parameter
+    :param a: lyapunov parameter (one has to be fixed)
+    :param upper: upper bound on the convergence rate
+    :param lower: lower bound on the convergence rate
+    :param epsilon: precision
+    :return:
+        - worst-case guarantee tau(mu, alpha, c)
+        - c
+        - dual variables associated with interpolation inequalities
 
-        """
-        ## PARAMETERS
-        npt = 2  # optimal and initial point
-        dimF = 1  # one dimension only
-        dimG = 2  # (x(t) // grad f(x(t)))
+    """
 
-        ## INITIALIZE with optimal point x_star
-        FF, GG, YY = [np.zeros((1, dimF))], [np.zeros((1, dimG))], [np.zeros((1, dimG))]
-        # define the point x(t)
-        y, f, g = np.zeros((1, dimG)), np.zeros((1, dimF)), np.zeros((1, dimG))
-        y[0][0], f[0][0], g[0][1] = 1., 1., 1.
-        YY.append(y)
-        FF.append(f)
-        GG.append(g)
+    if c == None or a == None:
+        # If there is no value for P, we optimize over the class of quadratic Lyapunov functions
+        l_ = None
+        c_ = c
+        a_ = a
+        while upper - lower >= epsilon:
+            tau = (lower + upper) / 2
+            # Variables in CVXPY
+            S = cp.Variable((2, 2), symmetric=True)
+            c = cp.Variable(1)
+            a = cp.Variable(1)
+            l = cp.Variable(2)  # dual values : interpolation inequalities
+            # CONSTRAINTS
+            ### Positivity of the interpolation inequalities
+            constraints = [l >= 0.]
+            ### Positivity and sclaing of the Lyapunov
+            constraints = constraints + [a >= 0.]
+            constraints = constraints + [c >= 0.]
+            constraints = constraints + [a + c == 1.]
+            ### LMI constraint
+            constraints = constraints + [ S << 0.]
+            constraints = constraints + [S[0][0] == tau * c - mu * (l[0] + l[1])/2]
+            constraints = constraints + [S[1][0] == -c * alpha + l[0]/2]
+            constraints = constraints + [S[1][1] == -a * alpha]
+            constraints = constraints + [tau * a == l[0] - l[1]]
+            # OPTIMIZE
+            prob = cp.Problem(cp.Minimize(0.), constraints)
+            try:
+                prob.solve(solver=cp.MOSEK)  # to improve the result: should require higher mosek precision.
+                status = prob.status
+            except Exception as e:
+                status = 'wrong'  # if MOSEK bugs, problem is declared infeasible.
+            if status == 'optimal':
+                lower = tau
+                c_ = c.value
+                l_ = l.value
+                if verbose:
+                    print('feasible point: interval is now {:.6}'.format(lower), ' ,{:.6}'.format(upper))
+            else:
+                upper = tau
+                if verbose:
+                    print('infeasible point: interval is now {:.6}'.format(lower), ' ,{:.6}'.format(upper))
 
-        # Compute the ODE
-        X_t = YY[1]  # X(t)
-        X_dot = - alpha * GG[1]  # dot(X(t)) = - alpha * grad(f)(X(t))
+    else:
+        # If there is no value for P, we optimize over the class of quadratic Lyapunov functions
+        l_ = None
+        a_ = a
+        c_ = c
+        while upper - lower >= epsilon:
+            tau = (lower + upper) / 2
+            # Variables in CVXPY
+            S = cp.Variable((2, 2), symmetric=True)
+            l = cp.Variable(2)  # dual values : interpolation inequalities
+            # CONSTRAINTS
+            ### Positivity of the interpolation inequalities
+            constraints = [l >= 0.]
+            ### Positivity and sclaing of the Lyapunov
+            ### LMI constraint
+            constraints = constraints + [S << 0.]
+            constraints = constraints + [S[0][0] == tau * c - mu * (l[0] + l[1]) / 2]
+            constraints = constraints + [S[1][0] == -c * alpha + l[0] / 2]
+            constraints = constraints + [S[1][1] == -a * alpha]
+            constraints = constraints + [tau * a == l[0] - l[1]]
+            # OPTIMIZE
+            prob = cp.Problem(cp.Minimize(0.), constraints)
+            try:
+                prob.solve(solver=cp.MOSEK)  # to improve the result: should require higher mosek precision.
+                status = prob.status
+            except Exception as e:
+                status = 'wrong'  # if MOSEK bugs, problem is declared infeasible.
+            if status == 'optimal':
+                lower = tau
+                l_ = l.value
+                if verbose:
+                    print('feasible point: interval is now {:.6}'.format(lower), ' ,{:.6}'.format(upper))
+            else:
+                upper = tau
+                if verbose:
+                    print('infeasible point: interval is now {:.6}'.format(lower), ' ,{:.6}'.format(upper))
 
-        ## GET THE INEQUALITIES
-        A = []
-        b = []
-        for i in range(npt):
-            for j in range(npt):
-                if j != i:
-                    if (mu != 0 & L != 0):
-                        Aij = np.dot((YY[i] - YY[j]).T, GG[j]) + \
-                              1 / 2 / (1 - mu / L) * (1 / L * np.dot((GG[i] - GG[j]).T, GG[i] - GG[j]) +
-                                                      mu * np.dot((YY[i] - YY[j]).T, YY[i] - YY[j]) -
-                                                      2 * mu / L * np.dot((YY[i] - YY[j]).T, GG[i] - GG[j]))
-                    if (mu != 0 & L == 0):
-                        Aij = np.dot((YY[i] - YY[j]).T, GG[j]) + \
-                              1 / 2 * mu * np.dot((YY[i] - YY[j]).T, YY[i] - YY[j])
-                    if (mu == 0 & L != 0):
-                        Aij = np.dot((YY[i] - YY[j]).T, GG[j]) + \
-                              1 / 2 / L * np.dot((GG[i] - GG[j]).T, GG[i] - GG[j])
-                    if (mu == 0 & L == 0):
-                        Aij = np.dot((YY[i] - YY[j]).T, GG[j])
-                    A.append(.5 * (Aij + Aij.T))
-                    b.append(FF[j] - FF[i])
-
-        if P == None :
-            # If there is no value for P, we optimize over the class of quadratic Lyapunov functions
-            l_ = None
-            P_ = P
-            while upper - lower >= epsilon:
-                tau = (lower + upper) / 2
-                # Variables in CVXPY
-                P = cp.Variable(1)
-                l = cp.Variable(npt * (npt - 1))  # dual values : interpolation inequalities
-                # CONSTRAINTS
-                ### Positivity of the interpolation inequalities
-                constraints = [l <= 0.]
-                ### Constraints for positivity of the Lyapunov
-                constraints = constraints + [P >= 0.]  # P is positive
-                constraints = constraints + [sum([l[i] * A[i] for i in range(len(A))])
-                                             + P * (X_dot.T @ X_t + X_t.T @ X_dot)
-                                             + a * (X_dot.T @ GG[1] + GG[1].T @ X_dot) / 2
-                                             + tau * P * X_t.T @ X_t << 0.]  # derivative of f(x(t))
-                constraints = constraints + [sum([l[i] * b[i][0] for i in range(len(b))])
-                                             + tau * (a * FF[1][0]) == 0.]
-                # OPTIMIZE
-                prob = cp.Problem(cp.Minimize(0.), constraints)
-                prob.solve(solver=cp.SCS)
-                if prob.status == 'optimal':
-                    lower = tau
-                    P_ = P.value
-                    l_ = l.value
-                else:
-                    upper = tau
-
-        else:
-            P_ = P
-            l_ = None
-
-            while upper - lower >= epsilon:
-                tau = (lower + upper) / 2
-                # Variables in CVXPY
-                l = cp.Variable(npt * (npt - 1)) # dual values : interpolation inequalities
-                # CONSTRAINTS
-                ### Positivity of the interpolation inequalities
-                constraints = [l <= 0]
-                constraints = constraints + [sum([l[i] * A[i] for i in range(len(A))])
-                                             + P * (X_dot.T @ X_t + X_t.T @ X_dot)
-                                             + a * (X_dot.T @ GG[1] + GG[1].T @ X_dot) / 2
-                                             + tau * P * X_t.T @ X_t << 0.]  # derivative of f(x(t))
-                constraints = constraints + [sum([l[i] * b[i][0] for i in range(len(b))])
-                                             + tau * (a * FF[1][0]) == 0.]
-                # OPTIMIZE
-                prob = cp.Problem(cp.Minimize(0.), constraints)
-                prob.solve(solver=cp.SCS)
-                if prob.status == 'optimal':
-                    lower = tau
-                    l_ = l.value
-                else:
-                    upper = tau
-
-        return tau, P_, l_
-
+    return tau, c_, a_, l_
 
 if __name__ == '__main__':
     # ODE parameter
     alpha = 1
     # Function class
-    L = 0 # smoothness parameter
-    mu = 0.0001 # strong-convexity parameter
+    mu = 0.0001  # strong-convexity parameter
+
+    # precision and verbose
+    epsilon = 10**-5
+    verbose = True
+
+    ## Compute worst-case guarantee for a given Lyapunov function
     # Lyapunov parameters
-    P = 0 # Lyapunov parameter
+    c = 0  # Lyapunov parameter
     a = 1
+    tau, _, _, l = compute_convergence_guarantee(mu=mu,
+                                                  alpha=alpha,
+                                                  a=a,
+                                                  c=c,
+                                                  epsilon=epsilon,
+                                                  verbose=verbose)
+    print('Convergence guarantee for given c,a > 0 ', tau, 2 * mu)
+    print('Relative error: ', np.abs(2 * mu - tau) / (2 * mu))
+    print(' ')
 
-    tau, _, l = compute_convergence_guarantee(mu=mu,
-                                              L=L,
-                                              alpha=alpha,
-                                              a=a,
-                                              P=P)
-    print('Convergence guarantee for a given P > 0 ', tau, 2 * mu)
-
-    tau, P, _,  = compute_convergence_guarantee(mu=mu,
-                                              L=L,
-                                              alpha=alpha,
-                                              a=a,
-                                             P=None)
-    print(l)
+    ## Compute worst-case guarantee while optimizing over Lyapunov functions
+    tau, c, a, _,  = compute_convergence_guarantee(mu=mu,
+                                                   alpha=alpha,
+                                                   epsilon=epsilon,
+                                                   verbose=verbose)
     print('Convergence guarantee while optimizing over P ', tau, 2 * mu)
-    print(P)
+    print('Relative error: ', np.abs(2 * mu - tau) / (2 * mu))
+    print(' ')
