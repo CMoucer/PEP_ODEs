@@ -93,7 +93,6 @@ def compute_worst_case_primal(mu, L, b, a=1, alpha = 1):
     return prob.value, G.value, F.value
 
 
-
 def worst_case_gf(L, mu, G, F, x, N=1, eps=0):
     """
     :param L: smoothness parameter

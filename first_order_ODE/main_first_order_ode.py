@@ -14,8 +14,8 @@ a = 1 # scalar
 epsilon = 10**-5
 verbose = False
 
-
 ### COMPUTE WORST-CASE GUARANTEE
+
 ## Given a Lyapunov function V(x(t)) = a* f(x(t)) - f_* + c * ||x(t) - x_*||^2, compute worst-case guarantee
 #c = 0 # scalar
 c = None
@@ -23,18 +23,20 @@ taus = np.zeros(len(mus))
 
 for i in range(len(mus)):
     taus[i], _, _, _ = compute_convergence_guarantee(mu=mus[i],
-                                                  alpha=alpha,
-                                                  a=a,
-                                                  c=c,
-                                                  epsilon=epsilon,
-                                                  verbose=verbose)
+                                                     alpha=alpha,
+                                                     a=a,
+                                                     c=c,
+                                                     epsilon=epsilon,
+                                                     verbose=verbose)
 
 ### PLOT
+
 ## Plot convergence guarantee
 if c== None:
     plt.plot(mus, taus, label='PEP optimized over Lyapunov functions')
 else:
     plt.plot(mus, taus, label='PEP for a given Lyapunov function')
+
 plt.plot(mus, 2 * mus, label='Theoretical guarantee')
 plt.semilogx()
 plt.semilogy()
@@ -44,7 +46,7 @@ plt.legend()
 plt.show()
 
 # Save convergence guarantee
-saved = True
+saved = False
 if saved:
     saved_txt = np.array([mus, taus, 2*mus])
     np.savetxt('/Users/cmoucer/PycharmProjects/ContinuousPEP/output/gradient_flow/gf.txt',
@@ -61,9 +63,8 @@ if relative_error:
     plt.ylabel('relative scale error')
     plt.show()
 
-
 ## Plot function in the worst-case
-plot_worst_case = False
+plot_worst_case = True
 if plot_worst_case:
     # number of points per dimension
     nn = 100

@@ -88,7 +88,7 @@ plt.ylabel('convergence guarantee')
 plt.legend()
 plt.show()
 
-saved = True
+saved = False
 if saved:
     if psd:
         saved_txt = np.array([mus, taus, np.sqrt(mus)])
