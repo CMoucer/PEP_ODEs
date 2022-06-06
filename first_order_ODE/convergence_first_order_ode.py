@@ -111,36 +111,3 @@ def compute_convergence_guarantee(mu, alpha=1, a=1., c = None,  upper=2., lower=
                     print('infeasible point: interval is now {:.6}'.format(lower), ' ,{:.6}'.format(upper))
 
     return tau, c_, a_, l_
-
-if __name__ == '__main__':
-    # ODE parameter
-    alpha = 1
-    # Function class
-    mu = 0.0001  # strong-convexity parameter
-
-    # precision and verbose
-    epsilon = 10**-5
-    verbose = True
-
-    ## Compute worst-case guarantee for a given Lyapunov function
-    # Lyapunov parameters
-    c = 0  # Lyapunov parameter
-    a = 1
-    tau, _, _, l = compute_convergence_guarantee(mu=mu,
-                                                  alpha=alpha,
-                                                  a=a,
-                                                  c=c,
-                                                  epsilon=epsilon,
-                                                  verbose=verbose)
-    print('Convergence guarantee for given c,a > 0 ', tau, 2 * mu)
-    print('Relative error: ', np.abs(2 * mu - tau) / (2 * mu))
-    print(' ')
-
-    ## Compute worst-case guarantee while optimizing over Lyapunov functions
-    tau, c, a, _,  = compute_convergence_guarantee(mu=mu,
-                                                   alpha=alpha,
-                                                   epsilon=epsilon,
-                                                   verbose=verbose)
-    print('Convergence guarantee while optimizing over P ', tau, 2 * mu)
-    print('Relative error: ', np.abs(2 * mu - tau) / (2 * mu))
-    print(' ')

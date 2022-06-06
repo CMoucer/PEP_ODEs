@@ -3,110 +3,66 @@ import matplotlib.pyplot as plt
 
 from convergence_second_order_ode import compute_convergence_guarantee, compute_convergence_primal
 
-mus = np.logspace(-4, 0, 8)
+# Function parameter
+mu = 0.01 # strong convexity
+# ODE parameters
 alpha = 1
-#Precision and verbose
-epsilon = 10 ** -5
+beta = 2 * np.sqrt(mu)
+# Precision and verbose
+epsilon = 10**-4
 verbose = False
-# If True, P is PSD, otherwise, the condition on P is relaxed.
+# Relaxation on P or not
 psd = False
 
-# Arrays for storing convergence rates and matrices P
-taus = np.zeros(len(mus))
-taus_fixed = np.zeros(len(mus))
-primal_taus = np.zeros(len(mus))
-Ps = np.zeros((len(mus), 2, 2)) # store the Lyapunov
-a_s = np.zeros(len(mus))
-
-for i in range(len(mus)):
-    beta = 2 * np.sqrt(mus[i])
-    # Compute worst-case guarantee
-    taus[i], Ps[i], _, _, a_s[i] = compute_convergence_guarantee(mu=mus[i],
+## COMPUTE WORST-CASE GUARANTEE WHILE OPTIMIZING OVER P
+relaxed_tau, relaxed_P, _, nu, a = compute_convergence_guarantee(mu=mu,
                                                                  alpha=alpha,
                                                                  beta=beta,
                                                                  psd=psd,
                                                                  epsilon=epsilon,
                                                                  verbose=verbose)
-    # Verify a Lyapunov function in the dual (LMI formulation)
-    P = np.zeros((2, 2))
-    a = 1.
-    if psd:
-        P[0][0] = mus[i] / 2
-        P[0][1] = np.sqrt(mus[i]) / 2
-        P[1][0] = np.sqrt(mus[i]) / 2
-        P[1][1] = 1 / 2
-    else:
-        P[0][0] = 4 / 9 * mus[i]
-        P[0][1] = 2 / 3 * np.sqrt(mus[i])
-        P[1][0] = 2 / 3 * np.sqrt(mus[i])
-        P[1][1] = 1 / 2
-    taus_fixed[i], _, _, _, _ = compute_convergence_guarantee(mu=mus[i],
-                                                              alpha=alpha,
-                                                              beta=beta,
-                                                              a=a,
-                                                              P=P,
-                                                              epsilon=epsilon,
-                                                              verbose=verbose)
-
-    # Verify a given Lyapunov function in the primal
-    primal_taus[i], _, _ = compute_convergence_primal(mu=mus[i],
-                                                      L=0,
-                                                      alpha=alpha,
-                                                      beta=beta,
-                                                      P=P)
-
-# PLOT CONVERGENCE GUARANTEE
-plt.plot(mus, taus, color='green', label='Optimization over Lyapunov functions')
-plt.plot(mus, taus_fixed, color='orange', label='Lyapunov verification in the dual')
-plt.plot(mus, -primal_taus, color='purple', label='Lyapunov verification in the primal')
-if psd:
-    plt.plot(mus, np.sqrt(mus), '--', color='green', label='sqrt(mu)')
+if not psd:
+    print('Convergence guarantee while optimizing over P', relaxed_tau, 4/3 * np.sqrt(mu))
 else:
-    plt.plot(mus, 4 / 3 * np.sqrt(mus), '--', color='green', label=' 4 / 3 sqrt(mu)')
-plt.semilogy()
-plt.semilogx()
-plt.xlabel('strong convexity parameter')
-plt.ylabel('convergence guarantee')
-plt.legend()
-plt.show()
+    print('Convergence guarantee while optimizing over P', relaxed_tau, np.sqrt(mu))
 
+## VERIFY WORST-CASE GUARANTEE FOR A GIVEN LYAPUNOV
+P = np.zeros((2, 2))
+a = 1
 
-## PLOT LYAPUNOV PARAMETERS
-plt.plot(mus, Ps[:, 0, 0]/a_s, color='orange', label='p11')
-plt.plot(mus, Ps[:, 0, 1]/a_s, color='green', label='p12')
-plt.plot(mus, Ps[:, 1, 1]/a_s, label='p22')
-if psd:
-    plt.plot(mus, 1 / 2 * np.sqrt(mus), '--', color='green', label='1/2 sqrt(mu)')
-    plt.plot(mus, 1 / 2 * mus, '--', color='orange', label='1/2 mu')
+if not psd:
+    P[0][0] = 4 / 9 * mu
+    P[1][0] = 2 / 3 * np.sqrt(mu)
+    P[0][1] = 2 / 3 * np.sqrt(mu)
+    P[1][1] = 1 / 2
 else:
-    plt.plot(mus, 2/3 * np.sqrt(mus), '--', color='green', label='2/3 sqrt(mu)')
-    plt.plot(mus, 4/9 * mus, '--', color='orange', label='4/9 mu')
-plt.semilogy()
-plt.semilogx()
-plt.xlabel('strong convexity parameter')
-plt.ylabel('convergence guarantee')
-plt.legend()
-plt.show()
+    P[0][0] = mu / 2
+    P[1][0] = np.sqrt(mu) / 2
+    P[0][1] = np.sqrt(mu) / 2
+    P[1][1] = 1 / 2
 
-saved = False
-if saved:
-    if psd:
-        saved_txt = np.array([mus, taus, np.sqrt(mus)])
-        np.savetxt('/Users/cmoucer/PycharmProjects/ContinuousPEP/output/hbm_flow/agf.txt',
-               saved_txt.T,
-               delimiter=' ',
-               header="condition agf theoryagf")
-    else:
-        saved_txt = np.array([mus, taus, 4/3 * np.sqrt(mus)])
-        np.savetxt('/Users/cmoucer/PycharmProjects/ContinuousPEP/output/hbm_flow/relaxed_agf.txt',
-                   saved_txt.T,
-                   delimiter=' ',
-                   header="condition agf theoryagf")
+tau_verif, _, _, _, _ = compute_convergence_guarantee(mu=mu,
+                                                       alpha=alpha,
+                                                       beta=beta,
+                                                       a=a,
+                                                       P=P,
+                                                       epsilon=epsilon,
+                                                       verbose=verbose)
 
-        saved_txt = np.array([mus, Ps[:, 0, 0]/a_s, Ps[:, 0, 1]/a_s, Ps[:, 1, 1]/a_s, 2 / 3 * np.sqrt(mus), mus * 4 / 9])
-        np.savetxt('/Users/cmoucer/PycharmProjects/ContinuousPEP/output/hbm_flow/P_agf.txt',
-                   saved_txt.T,
-                   delimiter=' ',
-                   header="condition p00 p01 p11 ref1 ref2")
+
+## COMPARE IN THE PRIMAL
+primal_tau, _, _ = compute_convergence_primal(mu=mu,
+                                              L=0,
+                                              alpha=alpha,
+                                              beta=beta,
+                                              P=P)
+if not psd:
+    print('Convergence guarantee for fixed P (relaxed), computed: ', tau_verif, ', theory: ', 4 / 3 * np.sqrt(mu))
+    print('Primal : convergence guarantee for fixed P (relaxed), computed: ', -primal_tau, ', theory: ', 4 / 3 * np.sqrt(mu))
+else:
+    print('Convergence guarantee for fixed P (psd)', tau_verif, np.sqrt(mu))
+    print('Primal : convergence guarantee for fixed P (psd) ', -primal_tau, np.sqrt(mu))
+
+
 
 
