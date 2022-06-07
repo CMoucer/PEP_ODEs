@@ -65,4 +65,4 @@ Our code allows to compute :
 * [PEPit - Python](https://github.com/PerformanceEstimation/PEPit) - B. Goujaud, C. Moucer, J. Hendricks, F. Glineur, A. Taylor, A. Dieuleveut
 * [Performance Estimation Problems](https://arxiv.org/abs/1206.3209) - Y. Drori, M. Teboulle
 * [Smooth Strongly Convex Interpolation and Exact Worst-case Performance of First-order Methods](https://arxiv.org/abs/1502.05666) - A. Taylor, J. Hendrickx, F. Glineur 
-* A systematic approach to Lyapunov analyses of continuous-time models in convex optimization (to come) - C. Moucer, A. Taylor, F. Bach
+* [A systematic approach to Lyapunov analyses of continuous-time models in convex optimization](https://arxiv.org/abs/2205.12772) - C. Moucer, A. Taylor, F. Bach
